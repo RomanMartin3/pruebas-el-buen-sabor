@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 // Importaciones añadidas/verificadas
 import com.powerRanger.ElBuenSabor.dtos.MercadoPagoCreatePreferenceDTO;
@@ -47,6 +48,7 @@ public class PedidoServiceImpl implements PedidoService {
     @Autowired private ArticuloInsumoRepository articuloInsumoRepository;
     @Autowired private LocalidadRepository localidadRepository;
     @Autowired private MercadoPagoService mercadoPagoService; // Asegúrate de que esté inyectado
+    @Autowired private SimpMessagingTemplate messagingTemplate;
     private static final Logger logger = LoggerFactory.getLogger(PedidoServiceImpl.class);
 
     // --- MAPPERS (Como los tenías) ---
@@ -283,6 +285,12 @@ public class PedidoServiceImpl implements PedidoService {
         Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId()).orElseThrow(() -> new Exception("No se encontró un perfil de Cliente para el usuario: " + usuario.getUsername()));
         Pedido pedido = mapAndPreparePedido(dto, cliente);
         Pedido pedidoGuardado = pedidoRepository.save(pedido);
+        // <-- AÑADE ESTO -->
+        // Notificar la creación del nuevo pedido a los topics.
+        System.out.println("WEBSOCKET: Notificando nuevo pedido ID: " + pedidoGuardado.getId());
+        messagingTemplate.convertAndSend("/topic/pedidos-cocina", convertToResponseDto(pedidoGuardado));
+        messagingTemplate.convertAndSend("/topic/pedidos-cajero", convertToResponseDto(pedidoGuardado));
+        // <-- FIN DE LA ADICIÓN -->
         return convertToResponseDto(pedidoGuardado);
     }
 
@@ -538,6 +546,12 @@ public class PedidoServiceImpl implements PedidoService {
 
         carritoService.vaciarCarrito(cliente);
         logger.info("Carrito vaciado para cliente ID: {}", cliente.getId());
+        // <<< INICIO DEL CÓDIGO A AÑADIR >>>
+        // Notificar la creación del nuevo pedido a los topics de Cajero y Cocina.
+        logger.info("WEBSOCKET: Notificando nuevo pedido ID: {}", pedidoGuardado.getId());
+        messagingTemplate.convertAndSend("/topic/pedidos-cajero", convertToResponseDto(pedidoGuardado));
+        messagingTemplate.convertAndSend("/topic/pedidos-cocina", convertToResponseDto(pedidoGuardado));
+        // <<< FIN DEL CÓDIGO A AÑADIR >>>
         logger.info("FIN - crearPedidoDesdeCarrito ejecutado exitosamente para Pedido ID: {}", pedidoGuardado.getId());
 
         return convertToResponseDto(pedidoGuardado);
@@ -607,6 +621,12 @@ public class PedidoServiceImpl implements PedidoService {
         }
         pedidoExistente.setEstado(nuevoEstado);
         Pedido pedidoActualizado = pedidoRepository.save(pedidoExistente);
+        // <-- AÑADE ESTO -->
+        // Notificar el cambio de estado del pedido.
+        System.out.println("WEBSOCKET: Notificando cambio de estado del pedido ID: " + pedidoActualizado.getId() + " a " + nuevoEstado);
+        messagingTemplate.convertAndSend("/topic/pedidos-cocina", convertToResponseDto(pedidoActualizado));
+        messagingTemplate.convertAndSend("/topic/pedidos-cajero", convertToResponseDto(pedidoActualizado));
+        // <-- FIN DE LA ADICIÓN -->
         return convertToResponseDto(pedidoActualizado);
     }
 
@@ -622,6 +642,15 @@ public class PedidoServiceImpl implements PedidoService {
         if (pedido.getEstado() != Estado.CANCELADO && pedido.getEstado() != Estado.RECHAZADO && pedido.getEstado() != Estado.ENTREGADO) {
             pedido.setEstado(Estado.CANCELADO);
         }
-        pedidoRepository.save(pedido);
+        Pedido pedidoActualizado = pedidoRepository.save(pedido);
+        
+        // <-- AÑADE ESTO (VERSIÓN CORREGIDA) -->
+        // Notificar la cancelación (borrado lógico) del pedido.
+        System.out.println("WEBSOCKET: Notificando cancelación del pedido ID: " + pedidoActualizado.getId() + " a " + pedidoActualizado.getEstado());
+        messagingTemplate.convertAndSend("/topic/pedidos-cocina", convertToResponseDto(pedidoActualizado));
+        messagingTemplate.convertAndSend("/topic/pedidos-cajero", convertToResponseDto(pedidoActualizado));
+        // <-- FIN DE LA ADICIÓN -->
     }
+    
+    
 }

@@ -19,7 +19,7 @@ public interface PedidoService {
     PedidoResponseDTO create(@Valid PedidoRequestDTO dto) throws Exception;
     PedidoResponseDTO createForAuthenticatedClient(String auth0Id, @Valid PedidoRequestDTO dto) throws Exception;
 
-
+    
     PedidoResponseDTO crearPedidoDesdeCarrito(Cliente cliente, @Valid CrearPedidoRequestDTO pedidoRequest) throws Exception; // Nuevo método
 
 
