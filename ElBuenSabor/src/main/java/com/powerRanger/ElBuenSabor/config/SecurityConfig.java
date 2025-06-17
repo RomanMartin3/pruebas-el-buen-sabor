@@ -47,6 +47,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
+                                // Permitir solicitudes OPTIONS para CORS preflight
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // <--- LÍNEA AÑADIDA
+
                                 // ENDPOINTS PÚBLICOS
                                 .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
@@ -94,6 +97,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.PUT, "/api/clientes/{clienteId}/carrito/items/{carritoItemId}").hasAuthority("ROLE_CLIENTE")
                                 .requestMatchers(HttpMethod.DELETE, "/api/clientes/{clienteId}/carrito/items/{carritoItemId}").hasAuthority("ROLE_CLIENTE")
                                 .requestMatchers(HttpMethod.DELETE, "/api/clientes/{clienteId}/carrito/items").hasAuthority("ROLE_CLIENTE")
+                                .requestMatchers(HttpMethod.GET, "/api/clientes/usuario/{auth0Id}").hasAnyAuthority("ROLE_CLIENTE", "ROLE_ADMIN")
 
                                 // Clientes
                                 .requestMatchers(HttpMethod.GET, "/api/clientes/perfil").hasAuthority("ROLE_CLIENTE")

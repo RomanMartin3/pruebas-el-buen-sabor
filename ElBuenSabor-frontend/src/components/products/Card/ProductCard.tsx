@@ -1,64 +1,50 @@
-/**
- * @file ProductCard.tsx
- * @description Componente de tarjeta individual para mostrar un artículo manufacturado (producto).
- * Presenta la imagen, denominación, descripción y precio de venta de un producto,
- * y permite al usuario añadirlo al carrito de compras, o ajustar la cantidad si ya está en él.
- * También incluye un botón para ver los detalles del producto en un modal.
- *
- * @props `product`: Objeto `ArticuloManufacturado` con los datos del producto a mostrar.
- * @hook `useCart`: Hook personalizado para interactuar con la lógica del carrito de compras.
- * @function `getImageUrl`: Función de utilidad para construir la URL completa de la imagen del producto.
- * @component `DetalleModal`: Modal para mostrar los detalles del producto.
- */
 import React, { useState } from 'react';
-import { Card, Button,Badge } from 'react-bootstrap';
+import { Card, Button, Badge } from 'react-bootstrap';
 import type { ArticuloManufacturado } from '../../../types/types';
 import { useCart } from '../../../context/CartContext';
-import { getImageUrl } from '../../../services/fileUploadService';
+import { FileUploadService } from '../../../services/fileUploadService';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faMinus, faTrash, faEye } from '@fortawesome/free-solid-svg-icons';
-import './ProductCard.sass';
 import DetalleModal from '../../../components/products/DetalleModal/DetalleModal';
+import './ProductCard.sass';
 
 interface ProductCardProps {
   product: ArticuloManufacturado;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const {
-    addToCart,
-    updateQuantity,
-    removeFromCart,
-    getItemQuantity,
-  } = useCart();
-
+  const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const fileUploadService = new FileUploadService();
 
-  const quantity = getItemQuantity(product.id);
+  const cartItem = cart.find(item => item.articulo.id === product.id);
+  const quantity = cartItem ? cartItem.quantity : 0;
+
   const defaultImage = '/placeholder-food.png';
-
-  // Determinar disponibilidad
   const isAvailable = product.estadoActivo && (typeof product.unidadesDisponiblesCalculadas === 'number' && product.unidadesDisponiblesCalculadas > 0);
-  // O si prefieres un booleano directo desde el backend: const isAvailable = product.disponible;
+
   const handleAddToCart = () => {
-    if (!isAvailable) return; // Doble chequeo
+    if (!isAvailable || !product.id) return;
     addToCart(product, 1);
   };
 
   const handleIncreaseQuantity = () => {
-    updateQuantity(product.id, quantity + 1);
+    if (!isAvailable || !cartItem) return;
+    updateQuantity(cartItem.id, quantity + 1);
   };
 
   const handleDecreaseQuantity = () => {
+    if (!isAvailable || !cartItem) return;
     if (quantity === 1) {
-      removeFromCart(product.id);
+      removeFromCart(cartItem.id);
     } else {
-      updateQuantity(product.id, quantity - 1);
+      updateQuantity(cartItem.id, quantity - 1);
     }
   };
-
+  
   const handleRemoveFromCart = () => {
-    removeFromCart(product.id);
+    if (!cartItem) return;
+    removeFromCart(cartItem.id);
   };
 
   const handleShowDetailModal = () => setShowDetailModal(true);
@@ -70,7 +56,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         variant="top"
         src={
           product.imagenes && product.imagenes.length > 0
-            ? getImageUrl(product.imagenes[0].denominacion)
+            ? fileUploadService.getImageUrl(product.imagenes[0].denominacion ?? '')
             : defaultImage
         }
         alt={`Imagen de ${product.denominacion}`}
@@ -84,17 +70,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.descripcion}
         </Card.Text>
 
-        {/* Nuevo contenedor para el footer: Precio y luego grupo de botones */}
         <div className="mt-auto product-card-bottom-section">
-          {/* Precio más grande y centrado */}
           <Card.Text className="product-card-price-display">${product.precioVenta.toFixed(2)}</Card.Text>
-                   {!product.estadoActivo ? (
+          {!product.estadoActivo ? (
             <Badge bg="secondary" className="my-2">No Activo</Badge>
           ) : !isAvailable ? (
             <Badge bg="danger" className="my-2">No disponible</Badge>
           ) : null}
 
-          {/* Grupo de botones (Agregar o Controles de Cantidad) */}
           <div className="product-card-buttons-group">
             {quantity === 0 ? (
               <Button variant="success" onClick={handleAddToCart} className="product-card-add-button" disabled={!isAvailable}>
@@ -109,12 +92,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                   <FontAwesomeIcon icon={faMinus} />
                 </Button>
                 <span className="mx-2 product-card-quantity-display">{quantity}</span>
-                <Button variant="outline-primary" onClick={handleIncreaseQuantity} className="product-card-control-button product-card-plus-button" disabled={!isAvailable}>
+                <Button variant="outline-primary" onClick={handleIncreaseQuantity} className="product-card-control-button product-card-plus-button" disabled={!isAvailable || (typeof product.unidadesDisponiblesCalculadas === 'number' && quantity >= product.unidadesDisponiblesCalculadas)}>
                   <FontAwesomeIcon icon={faPlus} />
                 </Button>
               </div>
             )}
-            {/* Botón para ver detalles */}
             <Button variant="outline-info" onClick={handleShowDetailModal} className="product-card-details-button">
               <FontAwesomeIcon icon={faEye} className="me-2" /> Ver Detalles
             </Button>
